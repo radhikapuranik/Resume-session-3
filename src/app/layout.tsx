@@ -1,31 +1,20 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Newsreader, Instrument_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const serif = Newsreader({ variable: "--font-serif-display", subsets: ["latin"], style: ["normal", "italic"] });
+const sans = Instrument_Sans({ variable: "--font-sans-body", subsets: ["latin"] });
+const mono = JetBrains_Mono({ variable: "--font-mono-body", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Hiring Dashboard",
-  description: "CV review pipeline for PM / SPM applicants",
+  title: "Kargo Shortlist",
+  description: "Rubric-scored shortlist of PM / SPM applicants for Kargo",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
-    >
-      <body className="min-h-full flex flex-col bg-neutral-950 text-neutral-100">
-        {children}
-      </body>
+    <html lang="en" className={`${serif.variable} ${sans.variable} ${mono.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
 }

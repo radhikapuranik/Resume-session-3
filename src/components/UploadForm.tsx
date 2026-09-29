@@ -10,10 +10,9 @@ export default function UploadForm() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [role, setRole] = useState<RoleType>("PM");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [pendingDuplicate, setPendingDuplicate] = useState<{ file: File; role: RoleType } | null>(
-    null
-  );
+  const [drag, setDrag] = useState(false);
+  const [message, setMessage] = useState<{ text: string; tone: "ok" | "warn" | "err" } | null>(null);
+  const [pendingDuplicate, setPendingDuplicate] = useState<{ file: File; role: RoleType } | null>(null);
 
   async function submit(file: File, roleApplied: RoleType, allowDuplicate: boolean) {
     setBusy(true);
@@ -29,76 +28,95 @@ export default function UploadForm() {
 
       if (res.status === 409 && data.duplicate) {
         setPendingDuplicate({ file, role: roleApplied });
-        setMessage(data.message ?? "Duplicate file detected.");
+        setMessage({ text: data.message ?? "Duplicate file detected.", tone: "warn" });
         return;
       }
-
       if (!res.ok) {
-        setMessage(data.error ?? "Upload failed.");
+        setMessage({ text: data.error ?? "Upload failed.", tone: "err" });
         return;
       }
-
       setPendingDuplicate(null);
-      if (data.needsManualReview) {
-        setMessage(`Uploaded, but flagged for manual review: ${data.manualReviewReason}`);
-      } else {
-        setMessage("Uploaded and scored.");
-      }
+      setMessage(
+        data.needsManualReview
+          ? { text: `Flagged for manual review: ${data.manualReviewReason}`, tone: "warn" }
+          : { text: `${file.name} scored against both rubrics.`, tone: "ok" }
+      );
       if (fileInputRef.current) fileInputRef.current.value = "";
       router.refresh();
     } catch {
-      setMessage("Upload failed — check your connection and try again.");
+      setMessage({ text: "Upload failed — check your connection and try again.", tone: "err" });
     } finally {
       setBusy(false);
     }
   }
 
+  const tone = { ok: "text-moss", warn: "text-ochre", err: "text-rust" };
+
   return (
-    <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <select
-          value={role}
-          onChange={(e) => setRole(e.target.value as RoleType)}
-          disabled={busy}
-          className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5 text-sm"
-        >
-          <option value="PM">Product Manager</option>
-          <option value="SPM">Senior Product Manager</option>
-        </select>
+    <section className="rounded-xl border border-line bg-card p-5">
+      <p className="eyebrow">Add a candidate</p>
+      <h2 className="mb-4 font-serif text-2xl leading-tight">Drop in a CV</h2>
+
+      <div className="mb-3 flex rounded-full border border-line bg-paper p-0.5 text-sm font-medium">
+        {(["PM", "SPM"] as const).map((r) => (
+          <button
+            key={r}
+            disabled={busy}
+            onClick={() => setRole(r)}
+            className={`flex-1 rounded-full px-3 py-1.5 transition ${role === r ? "bg-ink text-paper" : "text-muted hover:text-ink"}`}
+          >
+            {r === "PM" ? "Product Manager" : "Senior PM"}
+          </button>
+        ))}
+      </div>
+
+      <div
+        onClick={() => !busy && fileInputRef.current?.click()}
+        onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+        onDragLeave={() => setDrag(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDrag(false);
+          const f = e.dataTransfer.files?.[0];
+          if (f && !busy) submit(f, role, false);
+        }}
+        className={`flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 text-center transition ${
+          drag ? "border-clay bg-clay-soft" : "border-line hover:border-clay/60"
+        } ${busy ? "cursor-wait opacity-70" : ""}`}
+      >
+        {busy ? (
+          <>
+            <span className="mb-2 h-5 w-5 animate-spin rounded-full border-2 border-clay border-t-transparent" />
+            <p className="text-sm">Reading, redacting, scoring… (~20s)</p>
+          </>
+        ) : (
+          <>
+            <p className="font-serif text-lg">Drag a CV here</p>
+            <p className="text-xs text-muted">or click to browse · PDF or DOCX · applying as {role}</p>
+          </>
+        )}
         <input
           ref={fileInputRef}
           type="file"
           accept=".pdf,.docx"
-          disabled={busy}
+          hidden
           onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) submit(file, role, false);
+            const f = e.target.files?.[0];
+            if (f) submit(f, role, false);
           }}
-          className="text-sm file:mr-3 file:rounded file:border-0 file:bg-neutral-800 file:px-3 file:py-1.5 file:text-sm file:text-neutral-100 hover:file:bg-neutral-700"
         />
-        {busy && <span className="text-sm text-neutral-400">Processing…</span>}
       </div>
 
-      {message && <p className="mt-3 text-sm text-neutral-300">{message}</p>}
+      {message && <p className={`mt-3 text-sm ${tone[message.tone]}`}>{message.text}</p>}
 
       {pendingDuplicate && (
-        <div className="mt-3 flex items-center gap-3 rounded border border-amber-700 bg-amber-950/40 p-3 text-sm">
-          <span>This file was already uploaded. Process it again as a separate record?</span>
-          <button
-            className="rounded bg-amber-700 px-3 py-1 text-white hover:bg-amber-600"
-            disabled={busy}
-            onClick={() => submit(pendingDuplicate.file, pendingDuplicate.role, true)}
-          >
-            Upload anyway
-          </button>
-          <button
-            className="rounded border border-neutral-700 px-3 py-1 hover:bg-neutral-800"
-            onClick={() => setPendingDuplicate(null)}
-          >
-            Cancel
-          </button>
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-ochre-soft p-3 text-sm">
+          <span className="flex-1">Already uploaded. Process again as a separate record?</span>
+          <button className="rounded-full bg-ink px-3 py-1 text-xs text-paper" disabled={busy}
+            onClick={() => submit(pendingDuplicate.file, pendingDuplicate.role, true)}>Upload anyway</button>
+          <button className="rounded-full border border-line px-3 py-1 text-xs" onClick={() => setPendingDuplicate(null)}>Cancel</button>
         </div>
       )}
-    </div>
+    </section>
   );
 }
