@@ -3,6 +3,9 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { sendCandidateEmail, isResendConfigured } from "@/lib/resend";
 import type { Candidate, EmailDraft } from "@/lib/types";
 
+// TEMPORARY: no verified Resend domain yet, so every email goes to this address instead of the candidate's. Remove once a domain is verified.
+const TEMP_RECIPIENT_OVERRIDE = "radhika_puranik@pg27.mesaschool.co";
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -59,7 +62,7 @@ export async function POST(
   const subject = draft.subject.split("[[CANDIDATE_NAME]]").join(name ?? "there");
   const finalBody = draft.body.split("[[CANDIDATE_NAME]]").join(greetName);
 
-  const sendResult = await sendCandidateEmail({ to: email, subject, body: finalBody });
+  const sendResult = await sendCandidateEmail({ to: TEMP_RECIPIENT_OVERRIDE, subject, body: finalBody });
   if (!sendResult.ok) {
     return NextResponse.json({ error: sendResult.error }, { status: 502 });
   }
