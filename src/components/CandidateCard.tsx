@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { CandidateWithDetails, RoleType } from "@/lib/types";
+import type { CandidateWithDetails, RoleType, EmailDraft } from "@/lib/types";
+import type { Decision } from "@/lib/judgment";
 
 function RubricBreakdown({ candidate, role }: { candidate: CandidateWithDetails; role: RoleType }) {
   const scores = candidate.scores.filter((s) => s.rubric_role === role).sort((a, b) => b.weight - a.weight);
@@ -31,30 +32,40 @@ function RubricBreakdown({ candidate, role }: { candidate: CandidateWithDetails;
 
 export default function CandidateCard({
   candidate,
-  aboveLine,
+  decision,
+  role,
   rank,
 }: {
   candidate: CandidateWithDetails;
-  aboveLine: boolean;
+  decision: Decision;
+  role: RoleType;
   rank?: number;
 }) {
+  const aboveLine = decision.kind === "invite";
   const router = useRouter();
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [open, setOpen] = useState(aboveLine && rank === 1);
-  const [view, setView] = useState<RoleType>(candidate.role_applied);
+  const [open, setOpen] = useState(rank === 1);
+  const [view, setView] = useState<RoleType>(role);
+  const [sendingType, setSendingType] = useState<string | null>(null);
 
-  const primary = candidate.role_applied;
-  const total = (r: RoleType) => candidate.totals.find((t) => t.rubric_role === r)?.weighted_total;
-  const mainTotal = total(primary);
-  const draftType = aboveLine ? "invite" : "rejection";
-  const draft = candidate.drafts.find((d) => d.draft_type === draftType);
+    const total = (r: RoleType) => candidate.totals.find((t) => t.rubric_role === r)?.weighted_total;
+  const mainTotal = total(role);
+  const find = (t: "invite" | "rejection") => candidate.drafts.find((d) => d.draft_type === t);
+  const sentDraft = candidate.drafts.find((d) => d.sent);
+  const shown: EmailDraft[] = (
+    sentDraft
+      ? [sentDraft]
+      : decision.kind === "choose"
+        ? [find("rejection"), find("invite")]
+        : [find(decision.kind === "invite" ? "invite" : "rejection")]
+  ).filter((d): d is EmailDraft => Boolean(d));
   const name = candidate.personal_details?.name;
   const email = candidate.personal_details?.email;
 
-  async function confirmSend() {
-    if (!draft) return;
+  async function confirmSend(draftType: "invite" | "rejection") {
     setSending(true);
+    setSendingType(draftType);
     setError(null);
     try {
       const res = await fetch(`/api/candidates/${candidate.id}/send`, {
@@ -81,13 +92,13 @@ export default function CandidateCard({
             <h3 className="truncate font-serif text-xl leading-tight">{name ?? "Name not detected"}</h3>
             {candidate.needs_manual_review && <span className="rounded-full bg-rust-soft px-2 py-0.5 text-[0.68rem] text-rust">manual review</span>}
             {candidate.duplicate_of_candidate_id && <span className="rounded-full bg-ochre-soft px-2 py-0.5 text-[0.68rem] text-ochre">duplicate</span>}
-            {draft?.sent && <span className="rounded-full bg-moss-soft px-2 py-0.5 text-[0.68rem] text-moss">sent</span>}
+            {sentDraft && <span className="rounded-full bg-moss-soft px-2 py-0.5 text-[0.68rem] text-moss">sent</span>}
           </div>
           <p className="truncate text-xs text-muted">{email ?? "no email detected"} · {candidate.original_filename}</p>
         </div>
         <div className="text-right">
           <p className="font-serif text-3xl leading-none">{mainTotal !== undefined ? mainTotal.toFixed(1) : "—"}<span className="text-sm text-muted">/10</span></p>
-          <p className="eyebrow mt-1">{aboveLine && rank ? "invite" : rank ? "decline" : candidate.status.replace(/_/g, " ")}</p>
+          <p className="eyebrow mt-1">{decision.kind === "invite" ? "invite" : decision.kind === "choose" ? "your call" : rank ? "decline" : candidate.status.replace(/_/g, " ")}</p>
         </div>
       </button>
 
@@ -120,27 +131,41 @@ export default function CandidateCard({
             </div>
           )}
 
-          {draft && (
-            <div className="rounded-lg border border-line bg-paper p-3">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <span className="eyebrow">{draftType === "invite" ? "Interview invite · draft" : "Decline · draft"}</span>
-                {draft.sent ? (
-                  <span className="text-xs text-moss">Sent {draft.sent_at ? new Date(draft.sent_at).toLocaleString() : ""}</span>
-                ) : (
-                  <button
-                    onClick={confirmSend}
-                    disabled={sending || !email}
-                    className="rounded-full bg-clay px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-ink disabled:opacity-50"
-                  >
-                    {sending ? "Sending…" : draftType === "invite" ? "Confirm & send invite" : "Confirm & send"}
-                  </button>
-                )}
-              </div>
-              <p className="text-sm font-medium">{draft.subject}</p>
-              <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-muted">{draft.body}</p>
-              {error && <p className="mt-2 text-xs text-rust">{error}</p>}
+          {!sentDraft && decision.kind !== "invite" && decision.note && (
+            <div className={`rounded-lg p-3 ${decision.kind === "choose" ? "bg-ochre-soft" : "bg-paper border border-line"}`}>
+              <p className={`eyebrow mb-1 ${decision.kind === "choose" ? "!text-ochre" : ""}`}>
+                {decision.kind === "choose" ? "Judgment call · you pick" : "Suggestion"}
+              </p>
+              <p className="text-sm leading-relaxed">{decision.note}</p>
             </div>
           )}
+
+          <div className={decision.kind === "choose" && !sentDraft ? "grid gap-3 md:grid-cols-2" : ""}>
+            {shown.map((draft) => {
+              const isInvite = draft.draft_type === "invite";
+              return (
+                <div key={draft.id} className="rounded-lg border border-line bg-paper p-3">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <span className="eyebrow">{isInvite ? "Interview invite · draft" : "Decline · draft"}</span>
+                    {draft.sent ? (
+                      <span className="text-xs text-moss">Sent {draft.sent_at ? new Date(draft.sent_at).toLocaleString() : ""}</span>
+                    ) : (
+                      <button
+                        onClick={() => confirmSend(draft.draft_type)}
+                        disabled={sending || !email}
+                        className={`rounded-full px-4 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${isInvite ? "bg-clay text-white hover:bg-ink" : "bg-ink text-paper hover:bg-clay"}`}
+                      >
+                        {sending && sendingType === draft.draft_type ? "Sending…" : isInvite ? "Confirm & send invite" : "Confirm & send decline"}
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-sm font-medium">{draft.subject}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-muted">{draft.body}</p>
+                </div>
+              );
+            })}
+          </div>
+          {error && <p className="text-xs text-rust">{error}</p>}
         </div>
       )}
     </article>

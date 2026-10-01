@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { CandidateWithDetails, RoleType } from "@/lib/types";
 import CandidateCard from "./CandidateCard";
+import { decide } from "@/lib/judgment";
 
 const TOP_N = 5;
 
@@ -35,7 +36,7 @@ function RoleColumn({ title, candidates, role }: { title: string; candidates: Ca
                 <span className="h-px flex-1 bg-clay/50" />
               </div>
             )}
-            <CandidateCard candidate={c} aboveLine={i < TOP_N} rank={i + 1} />
+            <CandidateCard candidate={c} decision={decide(c, role, ranked, TOP_N)} role={role} rank={i + 1} />
           </div>
         ))}
       </div>
@@ -57,7 +58,7 @@ export default function Dashboard({ candidates }: { candidates: CandidateWithDet
           </button>
           {showFlagged && (
             <div className="mt-3 space-y-3">
-              {flagged.map((c) => <CandidateCard key={c.id} candidate={c} aboveLine={false} />)}
+              {flagged.map((c) => <CandidateCard key={c.id} candidate={c} decision={{ kind: "reject", note: null }} role={c.role_applied} />)}
             </div>
           )}
         </div>
