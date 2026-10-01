@@ -50,10 +50,10 @@ export function decide(c: CandidateWithDetails, role: RoleType, ranked: Candidat
     ? "the only candidate scored for this role so far"
     : rank === 0
       ? "currently the best candidate scored for this role"
-      : `ranked #${rank + 1} of ${ranked.length} here, with nobody above the bar yet`;
+      : `#${rank + 1} of ${ranked.length} scored for this role, all of them below the bar so far`;
   return {
     kind: "choose",
     lean: "none",
-    note: `${low} Defaulting toward reject, but this is ${position} and no stronger ${role} candidate exists yet, so you can still choose to invite. Consider holding until more candidates are in.`,
+    note: `${low} Defaulting toward reject, but this is ${position}, so no stronger ${role} candidate exists yet and you can still choose to invite. Consider holding until more candidates are in.`,
   };
 }
