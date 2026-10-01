@@ -9,7 +9,8 @@ const TOP_N = 5;
 
 function rankForRole(candidates: CandidateWithDetails[], role: RoleType) {
   return candidates
-    .filter((c) => c.role_applied === role && !c.duplicate_of_candidate_id && !c.needs_manual_review)
+    // Every candidate is scored against both rubrics, so every scored candidate belongs in both columns.
+    .filter((c) => !c.duplicate_of_candidate_id && !c.needs_manual_review && c.totals.some((t) => t.rubric_role === role))
     .sort((a, b) => {
       const at = a.totals.find((t) => t.rubric_role === role)?.weighted_total ?? -1;
       const bt = b.totals.find((t) => t.rubric_role === role)?.weighted_total ?? -1;

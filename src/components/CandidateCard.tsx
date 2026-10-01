@@ -57,7 +57,7 @@ export default function CandidateCard({
     sentDraft
       ? [sentDraft]
       : decision.kind === "choose"
-        ? [find("rejection"), find("invite")]
+        ? [find("rejection"), find("invite")] // reject first: low score defaults toward reject
         : [find(decision.kind === "invite" ? "invite" : "rejection")]
   ).filter((d): d is EmailDraft => Boolean(d));
   const name = candidate.personal_details?.name;
@@ -91,6 +91,7 @@ export default function CandidateCard({
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="truncate font-serif text-xl leading-tight">{name ?? "Name not detected"}</h3>
             {candidate.needs_manual_review && <span className="rounded-full bg-rust-soft px-2 py-0.5 text-[0.68rem] text-rust">manual review</span>}
+            {candidate.role_applied !== role && !candidate.needs_manual_review && <span className="rounded-full bg-paper px-2 py-0.5 text-[0.68rem] text-muted border border-line">applied: {candidate.role_applied}</span>}
             {candidate.duplicate_of_candidate_id && <span className="rounded-full bg-ochre-soft px-2 py-0.5 text-[0.68rem] text-ochre">duplicate</span>}
             {sentDraft && <span className="rounded-full bg-moss-soft px-2 py-0.5 text-[0.68rem] text-moss">sent</span>}
           </div>
@@ -108,7 +109,7 @@ export default function CandidateCard({
             <p className="rounded-lg bg-rust-soft p-3 text-xs text-rust">{candidate.manual_review_reason}</p>
           )}
 
-          {candidate.brief && (
+          {candidate.brief && candidate.role_applied === role && (
             <div className="rounded-lg bg-clay-soft/60 p-3">
               <p className="eyebrow !text-clay mb-1">Why here · what to probe</p>
               <p className="text-sm leading-relaxed">{candidate.brief.brief_text}</p>
@@ -131,11 +132,9 @@ export default function CandidateCard({
             </div>
           )}
 
-          {!sentDraft && decision.kind !== "invite" && decision.note && (
-            <div className={`rounded-lg p-3 ${decision.kind === "choose" ? "bg-ochre-soft" : "bg-paper border border-line"}`}>
-              <p className={`eyebrow mb-1 ${decision.kind === "choose" ? "!text-ochre" : ""}`}>
-                {decision.kind === "choose" ? "Judgment call · you pick" : "Suggestion"}
-              </p>
+          {!sentDraft && decision.kind === "choose" && (
+            <div className="rounded-lg bg-clay-soft/60 p-3">
+              <p className="eyebrow !text-clay mb-1">Below the bar · you decide</p>
               <p className="text-sm leading-relaxed">{decision.note}</p>
             </div>
           )}
@@ -155,7 +154,7 @@ export default function CandidateCard({
                         disabled={sending || !email}
                         className={`rounded-full px-4 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${isInvite ? "bg-clay text-white hover:bg-ink" : "bg-ink text-paper hover:bg-clay"}`}
                       >
-                        {sending && sendingType === draft.draft_type ? "Sending…" : isInvite ? "Confirm & send invite" : "Confirm & send decline"}
+                        {sending && sendingType === draft.draft_type ? "Sending…" : isInvite ? "Confirm & send invite" : "Confirm & send reject"}
                       </button>
                     )}
                   </div>

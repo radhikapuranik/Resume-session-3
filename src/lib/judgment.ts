@@ -5,7 +5,7 @@ export const BAR = 5.0;
 export type Decision =
   | { kind: "invite" }
   | { kind: "reject"; note: string | null }
-  | { kind: "choose"; note: string };
+  | { kind: "choose"; note: string; lean: "reject" | "none" };
 
 export function roleTotal(c: CandidateWithDetails, role: RoleType): number | undefined {
   return c.totals.find((t) => t.rubric_role === role)?.weighted_total;
@@ -37,20 +37,23 @@ export function decide(c: CandidateWithDetails, role: RoleType, ranked: Candidat
   const stronger = ranked.filter((r) => r.id !== c.id && (roleTotal(r, role) ?? -1) > BAR).length;
   const call = criteriaCall(c, role);
 
+  const low = `Score is low (${score.toFixed(1)}/10). ${call}`;
   if (stronger > 0) {
     return {
-      kind: "reject",
-      note: `${call} ${stronger} stronger ${role} candidate${stronger > 1 ? "s are" : " is"} already in the pool, so this one doesn't need to be chased. Rejection is the default.`,
+      kind: "choose",
+      lean: "reject",
+      note: `${low} ${stronger} stronger ${role} candidate${stronger > 1 ? "s" : ""} (above ${BAR.toFixed(1)}) ${stronger > 1 ? "are" : "is"} already scored for this role, so recommend reject — you can still invite.`,
     };
   }
   const alone = ranked.length <= 1;
   const position = alone
-    ? "the only one scored for this role so far"
+    ? "the only candidate scored for this role so far"
     : rank === 0
-      ? "currently the strongest option for this role"
-      : `ranked #${rank + 1} of ${ranked.length} for this role, with nobody above the bar yet`;
+      ? "currently the best candidate scored for this role"
+      : `ranked #${rank + 1} of ${ranked.length} here, with nobody above the bar yet`;
   return {
     kind: "choose",
-    note: `${call} They are ${position}, but below the bar and no stronger ${role} candidate exists yet. Consider holding the invite until more candidates are in, unless you want to move now — your call.`,
+    lean: "none",
+    note: `${low} Defaulting toward reject, but this is ${position} and no stronger ${role} candidate exists yet, so you can still choose to invite. Consider holding until more candidates are in.`,
   };
 }
